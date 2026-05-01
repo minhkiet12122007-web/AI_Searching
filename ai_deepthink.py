@@ -1,31 +1,29 @@
 import google.generativeai as genai
 import os
 
-# Lấy API Key từ Environment Variable trên Render (để bảo mật)
-# Hoặc dán trực tiếp: genai.configure(api_key="AIzaSy...")
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Render sẽ đọc mã này từ bảng Environment Variables bạn vừa cài
+api_key = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=api_key)
 
 
 def deep_process(user_query):
-    print(f"[Gemini] Processing query: '{user_query}'...")
+    print(f"[Gemini] Đang trả lời câu hỏi: '{user_query}'...")
     try:
-        # Sử dụng model Gemini 1.5 Flash (nhanh và miễn phí)
+        # Kiểm tra nếu chưa có mã Key
+        if not api_key:
+            return None, "Lỗi: Chưa cấu hình GEMINI_API_KEY trên Render."
+
         model = genai.GenerativeModel('gemini-1.5-flash')
 
-        # Yêu cầu AI trả lời kèm nguồn thông tin
-        prompt = f"Hãy trả lời câu hỏi sau một cách chi tiết bằng tiếng Việt: {user_query}. " \
-            f"Nếu có thông tin từ internet, hãy tổng hợp lại."
+        # Yêu cầu Gemini trả lời
+        response = model.generate_content(user_query)
 
-        response = model.generate_content(prompt)
-
-        if not response.text:
-            return None, "AI không thể tạo câu trả lời vào lúc này."
-
-        # Trả về định dạng giống cũ để bạn không phải sửa frontend
+        # Trả về kết quả (phải bọc trong [ ] để Frontend của bạn không bị lỗi)
         return {
             "data": [response.text],
-            "url": "Nguồn: Google Gemini AI"
+            "url": "Nguồn: Trí tuệ nhân tạo Gemini"
         }, None
 
     except Exception as e:
-        return None, f"Lỗi kết nối AI: {str(e)}"
+        print(f"Lỗi: {str(e)}")
+        return None, f"AI đang bận, bạn thử lại sau nhé! (Chi tiết: {str(e)})"
