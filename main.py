@@ -15,10 +15,13 @@ def index():
 def chat():
     user_input = request.json.get("message")
     if not user_input:
-        return jsonify({"error": "No message"}), 400
+        return jsonify({"error": "Vui lòng nhập tin nhắn"}), 400
 
-    topics = analyze_intent(user_input)
-    result, error = deep_process(topics)
+    # Phân tích ý định (từ file ai_thinking.py của bạn)
+    query_topic = analyze_intent(user_input)
+
+    # Xử lý bằng Gemini
+    result, error = deep_process(query_topic)
 
     if error:
         return jsonify({"error": error})
@@ -30,6 +33,6 @@ def chat():
 
 
 if __name__ == "__main__":
-    # Sử dụng port từ môi trường hoặc mặc định 5000
+    # Render yêu cầu chạy trên host 0.0.0.0 và port từ biến môi trường
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)

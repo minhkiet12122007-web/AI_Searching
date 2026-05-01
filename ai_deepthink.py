@@ -1,123 +1,31 @@
-import random
-import requests
-from bs4 import BeautifulSoup
+import google.generativeai as genai
+import os
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0.0.0 Safari/537.36"
-)
+# Lấy API Key từ Environment Variable trên Render (để bảo mật)
+# Hoặc dán trực tiếp: genai.configure(api_key="AIzaSy...")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def deep_process(user_query):
-    print(f"[DeepThink] Searching multiple sources for: '{user_query}'...")
+    print(f"[Gemini] Processing query: '{user_query}'...")
     try:
-        search_results = _search_google(user_query, num_results=10)
-        if not search_results:
-            search_results = _duckduckgo_search(user_query, num_results=10)
+        # Sử dụng model Gemini 1.5 Flash (nhanh và miễn phí)
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        if not search_results:
-            return None, "No search results found. Please try again with a different query."
+        # Yêu cầu AI trả lời kèm nguồn thông tin
+        prompt = f"Hãy trả lời câu hỏi sau một cách chi tiết bằng tiếng Việt: {user_query}. " \
+            f"Nếu có thông tin từ internet, hãy tổng hợp lại."
 
-        other_sources = [
-            url for url in search_results if "wikipedia.org" not in url]
-        top_url = other_sources[0] if other_sources else search_results[0]
+        response = model.generate_content(prompt)
 
-        print(f"[DeepThink] Reading content from source: {top_url}")
+        if not response.text:
+            return None, "AI không thể tạo câu trả lời vào lúc này."
 
-        paragraphs = _fetch_page_paragraphs(top_url)
-        if not paragraphs:
-            return None, "No detailed content found at this source."
-
-        return {"data": paragraphs, "url": top_url}, None
+        # Trả về định dạng giống cũ để bạn không phải sửa frontend
+        return {
+            "data": [response.text],
+            "url": "Nguồn: Google Gemini AI"
+        }, None
 
     except Exception as e:
-        return None, f"Error: {str(e)}"
-
-
-def _search_google(user_query, num_results=10):
-    try:
-        from googlesearch import search as google_search
-    except ImportError:
-        return []
-
-    try:
-        results = list(google_search(
-            user_query, num_results=num_results, lang="vi"))
-        if results:
-            return results
-        return list(google_search(user_query, num_results=num_results))
-    except TypeError:
-        try:
-            return list(google_search(user_query, num=num_results, lang="vi"))
-        except Exception:
-            return []
-    except Exception:
-        return []
-
-
-def _duckduckgo_search(user_query, num_results=10):
-    try:
-        resp = requests.post(
-            "https://html.duckduckgo.com/html/",
-            data={"q": user_query},
-            headers={"User-Agent": USER_AGENT},
-            timeout=10,
-        )
-        resp.raise_for_status()
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        results = []
-
-        for a in soup.select("a.result__a, a[data-testid='result-title-a']"):
-            href = a.get("href")
-            if href and href.startswith("http"):
-                results.append(href)
-                if len(results) >= num_results:
-                    break
-
-        if not results:
-            for a in soup.select("a"):
-                href = a.get("href")
-                if href and href.startswith("http") and "duckduckgo.com" not in href:
-                    results.append(href)
-                    if len(results) >= num_results:
-                        break
-
-        return results
-    except Exception:
-        return []
-
-
-def _fetch_page_paragraphs(url):
-    try:
-        resp = requests.get(
-            url, headers={"User-Agent": USER_AGENT}, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        for tag in soup(["script", "style", "noscript", "header", "footer", "aside"]):
-            tag.extract()
-
-        paragraphs = []
-        for p in soup.find_all("p"):
-            text = p.get_text(separator=" ", strip=True)
-            if len(text) >= 80:
-                paragraphs.append(_normalize_text(text))
-
-        if not paragraphs:
-            text = soup.get_text(separator="\n", strip=True)
-            for line in text.splitlines():
-                clean_line = line.strip()
-                if len(clean_line) >= 100:
-                    paragraphs.append(_normalize_text(clean_line))
-                    if len(paragraphs) >= 10:
-                        break
-
-        return paragraphs[:20]
-    except Exception:
-        return []
-
-
-def _normalize_text(text):
-    return " ".join(text.split())
+        return None, f"Lỗi kết nối AI: {str(e)}"
