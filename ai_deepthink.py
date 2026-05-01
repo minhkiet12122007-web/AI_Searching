@@ -13,7 +13,7 @@ def deep_process(user_query):
         if not api_key:
             return None, "Lỗi: Chưa cấu hình GEMINI_API_KEY trên Render."
 
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
 
         # Yêu cầu Gemini trả lời
         response = model.generate_content(user_query)
